@@ -17,7 +17,7 @@ spec:
         iam.gke.io/gke-metadata-server-enabled: "true"
       containers:
       - name: custom-metrics-writer
-        image: us-docker.pkg.dev/<GCP_PROJECT_ID>/metric-writer/latest
+        image: us-docker.pkg.dev/nginx-flask-mongo-hw3/metric-writer/latest
         imagePullPolicy: IfNotPresent
         env:
         - name: DB_USER
@@ -40,7 +40,7 @@ spec:
         - name: DB_PORT
           value: "3306"
         - name: PROJECT_ID
-          value: "<GCP_PROJECT_ID>"
+          value: "nginx-flask-mongo-hw3"
         - name: QUERY
           value: "select metric_value from metrics where metric_name = 'app-metric-1';"
         - name: METRIC_NAME
@@ -59,7 +59,7 @@ spec:
   
             # Replace DB_PORT with the port the proxy should listen on
           - "--port=3306"
-          - "<CLOUDSQL_CONNECTION_NAME>"
+          - "nginx-flask-mongo-hw3:us-central1:custom-metrics-db"
         securityContext:
             # The default Cloud SQL proxy image runs as the
             # "nonroot" user and group (uid: 65532) by default.
@@ -74,8 +74,8 @@ spec:
               # The proxy's memory use scales linearly with the number of active
               # connections. Fewer open connections will use less memory. Adjust
               # this value based on your application's requirements.
-            memory: "2Gi"
+            memory: "256Mi"
               # The proxy's CPU use scales linearly with the amount of IO between
               # the database and the application. Adjust this value based on your
               # application's requirements.
-            cpu:    "1"
+            cpu: "100m"

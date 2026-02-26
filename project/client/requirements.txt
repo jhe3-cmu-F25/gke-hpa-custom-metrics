@@ -1,0 +1,11 @@
+# Web framework
+Flask==3.0.3
+
+# Kafka client (pure-Python, no librdkafka dependency)
+kafka-python==2.0.2
+
+# Load .env files into os.environ
+python-dotenv==1.0.1
+
+# Google Cloud Dataproc SDK (placeholder — used in gcp_config.py)
+google-cloud-dataproc==5.11.0

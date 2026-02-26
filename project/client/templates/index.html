@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inverted Index Search Engine</title>
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.1);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 800px;
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 0.4rem; color: #2b6cb0; }
+    h2 { font-size: 1.2rem; margin-bottom: 1.2rem; color: #4a5568; }
+    p.subtitle { color: #718096; margin-bottom: 1.5rem; font-size: .95rem; }
+
+    /* ── Forms ── */
+    .form-group { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    input[type="text"], input[type="number"] {
+      flex: 1;
+      min-width: 0;
+      padding: .65rem 1rem;
+      border: 1.5px solid #cbd5e0;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    input:focus { border-color: #4299e1; }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: .65rem 1.4rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      white-space: nowrap;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-primary   { background: #4299e1; color: #fff; }
+    .btn-success   { background: #48bb78; color: #fff; }
+    .btn-secondary { background: #e2e8f0; color: #4a5568; }
+    .btn-outline   { background: transparent; border: 1.5px solid #4299e1; color: #4299e1; }
+    .btn-row { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+
+    /* ── Status banners ── */
+    .banner {
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.2rem;
+      font-size: .95rem;
+      display: none;
+    }
+    .banner.show   { display: block; }
+    .banner-info   { background: #ebf8ff; border: 1px solid #bee3f8; color: #2c5282; }
+    .banner-success{ background: #f0fff4; border: 1px solid #9ae6b4; color: #22543d; }
+    .banner-error  { background: #fff5f5; border: 1px solid #feb2b2; color: #742a2a; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid #bee3f8;
+      border-top-color: #4299e1;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      vertical-align: middle;
+      margin-right: .5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Results table ── */
+    .results-wrap { overflow-x: auto; margin-top: 1.2rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .9rem;
+    }
+    th {
+      background: #ebf8ff;
+      color: #2b6cb0;
+      padding: .6rem .9rem;
+      text-align: left;
+      border-bottom: 2px solid #bee3f8;
+    }
+    td {
+      padding: .55rem .9rem;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #f7fafc; }
+    td a { color: #4299e1; word-break: break-all; }
+    .exec-time { color: #718096; font-size: .85rem; margin-top: .6rem; }
+
+    /* ── Section visibility ── */
+    .section { display: none; }
+    .section.active { display: block; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>Inverted Index Search Engine</h1>
+  <p class="subtitle">Powered by Hadoop MapReduce &bull; Kafka &bull; GCP Dataproc</p>
+
+  <!-- ================================================================
+       SECTION 1 — Home: URL input
+  ================================================================ -->
+  <div id="sec-home" class="section active">
+    <h2>Step 1: Index Papers</h2>
+    <p style="color:#718096;margin-bottom:1rem;">
+      Paste a Google Scholar author or search URL below.
+      The engine will fetch and index all papers found at that URL.
+    </p>
+    <form id="form-index" onsubmit="submitUrl(event)">
+      <div class="form-group">
+        <input
+          type="text"
+          id="scholar-url"
+          placeholder="https://scholar.google.com/citations?user=..."
+          required
+        />
+        <button type="submit" class="btn btn-primary" id="btn-index">
+          Index Papers from this URL
+        </button>
+      </div>
+    </form>
+    <div id="banner-loading" class="banner banner-info">
+      <span class="spinner"></span>
+      Indexing in progress — this may take a minute. Please wait&hellip;
+    </div>
+    <div id="banner-error-home" class="banner banner-error"></div>
+  </div>
+
+  <!-- ================================================================
+       SECTION 2 — Engine loaded
+  ================================================================ -->
+  <div id="sec-loaded" class="section">
+    <div class="banner banner-success show">
+      &#10003; Engine was Loaded &amp; Inverted indices were constructed successfully!
+    </div>
+    <p style="color:#4a5568;margin-bottom:1rem;">What would you like to do next?</p>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="showSection('sec-search')">Search for Term</button>
+      <button class="btn btn-outline" onclick="showSection('sec-topn')">Most Frequent Terms</button>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       SECTION 3 — Search Term
+  ================================================================ -->
+  <div id="sec-search" class="section">
+    <h2>Search for a Term</h2>
+    <form id="form-search" onsubmit="searchTerm(event)">
+      <div class="form-group">
+        <input type="text" id="search-term" placeholder="e.g. neural network" required />
+        <button type="submit" class="btn btn-primary" id="btn-search">Search</button>
+      </div>
+    </form>
+    <div id="banner-loading-search" class="banner banner-info">
+      <span class="spinner"></span>Searching&hellip;
+    </div>
+    <div id="banner-error-search" class="banner banner-error"></div>
+
+    <div id="search-results" class="results-wrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Doc ID / IEEE URL</th>
+            <th>Doc Name</th>
+            <th>Citations</th>
+            <th>Frequency</th>
+          </tr>
+        </thead>
+        <tbody id="search-tbody"></tbody>
+      </table>
+      <p id="search-exec-time" class="exec-time"></p>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="showSection('sec-loaded')">&#8592; Select Again</button>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       SECTION 4 — Top-N
+  ================================================================ -->
+  <div id="sec-topn" class="section">
+    <h2>Most Frequent Terms</h2>
+    <form id="form-topn" onsubmit="fetchTopN(event)">
+      <div class="form-group">
+        <input type="number" id="topn-n" value="10" min="1" max="500" required />
+        <button type="submit" class="btn btn-success" id="btn-topn">Find Top-N Terms</button>
+      </div>
+    </form>
+    <div id="banner-loading-topn" class="banner banner-info">
+      <span class="spinner"></span>Fetching top terms&hellip;
+    </div>
+    <div id="banner-error-topn" class="banner banner-error"></div>
+
+    <div id="topn-results" class="results-wrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Term</th>
+            <th>Total Frequency</th>
+          </tr>
+        </thead>
+        <tbody id="topn-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="showSection('sec-loaded')">&#8592; Select Again</button>
+    </div>
+  </div>
+</div><!-- /.card -->
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function showSection(id) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+
+function showBanner(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.add("show");
+}
+
+function hideBanner(id) {
+  const el = document.getElementById(id);
+  el.classList.remove("show");
+  el.textContent = "";
+}
+
+function setLoading(bannerId, btnId, loading) {
+  document.getElementById(bannerId).classList.toggle("show", loading);
+  const btn = document.getElementById(btnId);
+  if (btn) btn.disabled = loading;
+}
+
+// ── Task 1: Index Papers ──────────────────────────────────────────────────────
+
+async function submitUrl(e) {
+  e.preventDefault();
+  hideBanner("banner-error-home");
+  setLoading("banner-loading", "btn-index", true);
+
+  const url = document.getElementById("scholar-url").value.trim();
+  const body = new FormData();
+  body.append("scholar_url", url);
+
+  try {
+    const resp = await fetch("/index-papers", { method: "POST", body });
+    const data = await resp.json();
+    if (!resp.ok) {
+      showBanner("banner-error-home", data.error || "Unknown error occurred.");
+    } else {
+      showSection("sec-loaded");
+    }
+  } catch (err) {
+    showBanner("banner-error-home", "Network error: " + err.message);
+  } finally {
+    setLoading("banner-loading", "btn-index", false);
+  }
+}
+
+// ── Task 3: Search Term ───────────────────────────────────────────────────────
+
+async function searchTerm(e) {
+  e.preventDefault();
+  hideBanner("banner-error-search");
+  document.getElementById("search-results").style.display = "none";
+  setLoading("banner-loading-search", "btn-search", true);
+
+  const term = document.getElementById("search-term").value.trim();
+  const body = new FormData();
+  body.append("term", term);
+
+  try {
+    const resp = await fetch("/search", { method: "POST", body });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      showBanner("banner-error-search", data.error || "Unknown error.");
+      return;
+    }
+
+    // Render results table
+    const tbody = document.getElementById("search-tbody");
+    tbody.innerHTML = "";
+    (data.results || []).forEach((row, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td><a href="${esc(row.url)}" target="_blank" rel="noopener">${esc(row.doc_id)}</a></td>
+        <td>${esc(row.doc_name)}</td>
+        <td>${esc(row.citations)}</td>
+        <td>${esc(row.frequency)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    if (data.execution_time !== undefined) {
+      document.getElementById("search-exec-time").textContent =
+        `Execution time: ${Number(data.execution_time).toFixed(4)}s`;
+    }
+
+    document.getElementById("search-results").style.display = "block";
+  } catch (err) {
+    showBanner("banner-error-search", "Network error: " + err.message);
+  } finally {
+    setLoading("banner-loading-search", "btn-search", false);
+  }
+}
+
+// ── Task 4: Top-N ─────────────────────────────────────────────────────────────
+
+async function fetchTopN(e) {
+  e.preventDefault();
+  hideBanner("banner-error-topn");
+  document.getElementById("topn-results").style.display = "none";
+  setLoading("banner-loading-topn", "btn-topn", true);
+
+  const n = document.getElementById("topn-n").value;
+  const body = new FormData();
+  body.append("n", n);
+
+  try {
+    const resp = await fetch("/topn", { method: "POST", body });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      showBanner("banner-error-topn", data.error || "Unknown error.");
+      return;
+    }
+
+    const tbody = document.getElementById("topn-tbody");
+    tbody.innerHTML = "";
+    (data.results || []).forEach((row, i) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${i + 1}</td>
+        <td>${esc(row.term)}</td>
+        <td>${esc(row.total_frequency)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById("topn-results").style.display = "block";
+  } catch (err) {
+    showBanner("banner-error-topn", "Network error: " + err.message);
+  } finally {
+    setLoading("banner-loading-topn", "btn-topn", false);
+  }
+}
+
+// Escape HTML to prevent XSS
+function esc(v) {
+  if (v === null || v === undefined) return "";
+  return String(v)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+</script>
+</body>
+</html>
